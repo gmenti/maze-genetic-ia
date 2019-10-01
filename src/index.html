@@ -1,8 +1,151 @@
 <html>
   <head>
     <title>Maze IA</title>
+    <style>
+      td,
+      th {
+        min-width: 15px;
+        max-width: 15px;
+        min-height: 15px;
+        max-height: 15px;
+      }
+    </style>
   </head>
   <body>
-    <h1>Hello world</h1>
+    <div id="mazes"></div>
+    <div id="content"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js"></script>
+    <script>
+      const Direction = {
+        TOP: 0,
+        TOP_RIGHT: 1,
+        RIGHT: 2,
+        BOTTOM_RIGHT: 3,
+        BOTTOM: 4,
+        BOTTOM_LEFT: 5,
+        LEFT: 6,
+        TOP_LEFT: 7
+      };
+
+      const contentDiv = document.getElementById('content');
+      const mazesDiv = document.getElementById('mazes');
+
+      const renderMaze = (maze, index, way = null) => {
+        const table = document.createElement('table');
+        table.bgColor = 'black';
+
+        const getWalkedPositions = () => {
+          if (!way) {
+            return [];
+          }
+          let actualPosition = { x: 0, y: 0 };
+          const walkedPositions = [actualPosition];
+          way.forEach(direction => {
+            const { x, y } = actualPosition;
+            switch (direction) {
+              case Direction.TOP:
+                actualPosition = { x, y: y - 1 };
+                break;
+              case Direction.TOP_RIGHT:
+                actualPosition = { x: x + 1, y: y - 1 };
+                break;
+              case Direction.RIGHT:
+                actualPosition = { x: x + 1, y };
+                break;
+              case Direction.BOTTOM_RIGHT:
+                actualPosition = { x: x + 1, y: y + 1 };
+                break;
+              case Direction.BOTTOM:
+                actualPosition = { x, y: y + 1 };
+                break;
+              case Direction.BOTTOM_LEFT:
+                actualPosition = { x: x - 1, y: y + 1 };
+                break;
+              case Direction.LEFT:
+                actualPosition = { x: x - 1, y };
+                break;
+              case Direction.TOP_LEFT:
+                actualPosition = { x: x - 1, y: y - 1 };
+                break;
+              default:
+                throw new Error(`Invalid direction (${direction})`);
+            }
+            walkedPositions.push(actualPosition);
+          });
+          return walkedPositions;
+        };
+
+        const walkedPositions = getWalkedPositions();
+
+        let movementNumber = 0;
+        maze.rows.forEach((row, y) => {
+          const tr = document.createElement('tr');
+          row.forEach((value, x) => {
+            const walked = walkedPositions.filter(position => position.x === x && position.y === y);
+            const td = document.createElement('td');
+            let style = 'padding: 20px;';
+            td.style = style;
+            td.textContent = value;
+            switch (value) {
+              case '0':
+                td.bgColor = 'grey';
+                break;
+              case 'E':
+                td.bgColor = 'red';
+                break;
+              case 'S':
+                td.bgColor = 'green';
+                findedExit = true;
+                break;
+            }
+            if (walked.length) {
+              td.bgColor = 'pink'; // walked.map(position => walkedPositions.indexOf(position)).join(', ');
+              style += 'text-align: center; color: white;'
+            }
+            tr.appendChild(td);
+          });
+          table.appendChild(tr);
+        });
+
+        if (contentDiv.lastElementChild) {
+          contentDiv.replaceChild(table, contentDiv.lastElementChild);
+        } else {
+          contentDiv.appendChild(table);
+        }
+
+        if (!way) {
+          socket.emit('start', index);
+        }
+      };
+
+      const renderList = mazes => {
+        const ulElement = document.createElement('ul');
+        mazes.forEach((maze, index) => {
+          const liElement = document.createElement('li');
+          const linkElement = document.createElement('a');
+          linkElement.textContent = `Maze ${index}`;
+          linkElement.setAttribute('href', '#');
+          linkElement.onclick = () => {
+            renderMaze(maze, index);
+          };
+          liElement.appendChild(linkElement);
+          ulElement.appendChild(liElement);
+        });
+        mazesDiv.appendChild(ulElement);
+      };
+
+      const socket = io();
+      socket.on('mazes', mazes => {
+        renderList(mazes);
+      });
+
+      socket.on('best', ({ maze, index, bestWay }) => {
+        renderMaze(maze, index, bestWay);
+      });
+
+      socket.on('result', ({ maze, index, bestWay }) => {
+        renderMaze(maze, index, bestWay);
+      });
+    </script>
   </body>
 </html>
